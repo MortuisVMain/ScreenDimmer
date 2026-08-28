@@ -1,8 +1,18 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 
 namespace ScreenDimmer;
+
+public class MonitorSetting
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public int NormalBrightness { get; set; } = 80;
+    public int DimBrightness { get; set; } = 0;
+    public int LastBrightness { get; set; } = 80;
+}
 
 public class AppSettings
 {
@@ -11,6 +21,7 @@ public class AppSettings
     public bool FadeAnimation { get; set; } = true;
     public bool MuteAudioInBlackout { get; set; } = false;
     public bool ShowBrightnessHud { get; set; } = true;
+    public Dictionary<string, MonitorSetting> MonitorSettings { get; set; } = new();
 }
 
 public static class SettingsManager
@@ -61,6 +72,39 @@ public static class SettingsManager
             File.WriteAllText(SettingsFilePath, json);
         }
         catch { }
+    }
+
+    public static MonitorSetting GetOrCreateMonitorSetting(string id, string name, int detectedBrightness)
+    {
+        if (!_settings.MonitorSettings.TryGetValue(id, out var setting))
+        {
+            int initBri = (detectedBrightness >= 0 && detectedBrightness <= 100) 
+                ? detectedBrightness 
+                : _settings.DefaultNormalBrightness;
+
+            setting = new MonitorSetting
+            {
+                Id = id,
+                Name = name,
+                NormalBrightness = Math.Clamp(initBri, 0, 100),
+                DimBrightness = _settings.DimPercentage,
+                LastBrightness = Math.Clamp(initBri, 0, 100)
+            };
+            _settings.MonitorSettings[id] = setting;
+            Save();
+        }
+        return setting;
+    }
+
+    public static void UpdateMonitorSetting(string id, int? normalBrightness = null, int? dimBrightness = null, int? lastBrightness = null)
+    {
+        if (_settings.MonitorSettings.TryGetValue(id, out var setting))
+        {
+            if (normalBrightness.HasValue) setting.NormalBrightness = Math.Clamp(normalBrightness.Value, 0, 100);
+            if (dimBrightness.HasValue) setting.DimBrightness = Math.Clamp(dimBrightness.Value, 0, 100);
+            if (lastBrightness.HasValue) setting.LastBrightness = Math.Clamp(lastBrightness.Value, 0, 100);
+            Save();
+        }
     }
 
     public static void SetDimPercentage(int percent)

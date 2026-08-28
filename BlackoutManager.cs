@@ -185,7 +185,11 @@ public static class BlackoutManager
         // Плавная кино-анимация появления
         foreach (var form in formsToFade)
         {
-            await form.FadeInAsync();
+            try
+            {
+                await form.FadeInAsync();
+            }
+            catch { }
         }
     }
 

@@ -16,13 +16,16 @@ public class TrayApplicationContext : ApplicationContext
     private readonly ToolStripMenuItem _blackoutMenuItem;
     private readonly ToolStripMenuItem _dimMenuItem;
     private readonly ToolStripMenuItem _restoreMenuItem;
+    private readonly ToolStripMenuItem _perMonitorBrightnessMenu;
     private readonly ToolStripMenuItem _soloScreenMenu;
     private readonly ToolStripMenuItem _sleepTimerMenu;
     private readonly ToolStripMenuItem _dimLevelMenu;
     private readonly ToolStripMenuItem _optionsMenu;
+    private readonly ToolStripMenuItem _displaySettingsMenuItem;
     private readonly ToolStripMenuItem _brightnessInfoItem;
     private readonly ToolStripMenuItem _autoRunMenuItem;
 
+    private DisplaySettingsForm? _settingsForm;
     private IntPtr _currentIconHandle = IntPtr.Zero;
     private readonly int[] _presetLevels = { 0, 1, 2, 3, 5, 10, 15, 20 };
 
@@ -42,6 +45,7 @@ public class TrayApplicationContext : ApplicationContext
         _mouseWheelHook.WheelScrolled += OnTrayWheelScrolled;
 
         _brightnessController.StateChanged += OnBrightnessStateChanged;
+        _brightnessController.MonitorsUpdated += UpdateMenuState;
         BlackoutManager.StateChanged += OnBlackoutStateChanged;
         SleepTimerManager.TimerTick += OnSleepTimerTick;
         SleepTimerManager.StateChanged += isRunning => UpdateMenuState();
@@ -53,7 +57,11 @@ public class TrayApplicationContext : ApplicationContext
         _dimMenuItem = new ToolStripMenuItem($"🌙 Затемнить до {SettingsManager.Current.DimPercentage}% (Alt + .)", null, (s, e) => _brightnessController.Dim());
         _restoreMenuItem = new ToolStripMenuItem("☀️ Восстановить яркость (Alt + /)", null, (s, e) => OnRestoreRequested());
 
-        // Подменю раздельного управления мониторами
+        // Подменю раздельного управления яркостью каждого монитора
+        _perMonitorBrightnessMenu = new ToolStripMenuItem("💻 Яркость по мониторам");
+        BuildPerMonitorMenu();
+
+        // Подменю раздельного управления мониторами (Solo mode)
         _soloScreenMenu = new ToolStripMenuItem("🖥️ Режим экранов");
         BuildSoloScreenMenu();
 
@@ -69,13 +77,15 @@ public class TrayApplicationContext : ApplicationContext
         _optionsMenu = new ToolStripMenuItem("⚙️ Опции и анимации");
         BuildOptionsMenu();
 
+        _displaySettingsMenuItem = new ToolStripMenuItem("🎛️ Настройка экранов и яркости...", null, (s, e) => OpenDisplaySettings());
+
         _autoRunMenuItem = new ToolStripMenuItem("🚀 Запуск вместе с Windows", null, OnAutoRunToggled)
         {
             CheckOnClick = true,
             Checked = AutoRunManager.IsAutoRunEnabled()
         };
 
-        _brightnessInfoItem = new ToolStripMenuItem($"📊 Текущая яркость: {_brightnessController.GetAverageBrightness()}% (Скролл трея)")
+        _brightnessInfoItem = new ToolStripMenuItem($"📊 Средняя яркость: {_brightnessController.GetAverageBrightness()}% (Скролл трея)")
         {
             Enabled = false
         };
@@ -86,10 +96,12 @@ public class TrayApplicationContext : ApplicationContext
         contextMenu.Items.Add(_dimMenuItem);
         contextMenu.Items.Add(_restoreMenuItem);
         contextMenu.Items.Add(new ToolStripSeparator());
+        contextMenu.Items.Add(_perMonitorBrightnessMenu);
         contextMenu.Items.Add(_soloScreenMenu);
         contextMenu.Items.Add(_sleepTimerMenu);
         contextMenu.Items.Add(_dimLevelMenu);
         contextMenu.Items.Add(_optionsMenu);
+        contextMenu.Items.Add(_displaySettingsMenuItem);
         contextMenu.Items.Add(_autoRunMenuItem);
         contextMenu.Items.Add(_brightnessInfoItem);
         contextMenu.Items.Add(new ToolStripSeparator());
@@ -126,7 +138,7 @@ public class TrayApplicationContext : ApplicationContext
         contextMenu.Opening += (s, e) =>
         {
             int bri = _brightnessController.GetAverageBrightness();
-            _brightnessInfoItem.Text = $"📊 Текущая яркость: {bri}% (Скролл трея)";
+            _brightnessInfoItem.Text = $"📊 Средняя яркость: {bri}% (Скролл трея)";
             _dimMenuItem.Text = $"🌙 Затемнить до {SettingsManager.Current.DimPercentage}% (Alt + .)";
             _dimMenuItem.Enabled = !_brightnessController.IsDimmed && !BlackoutManager.IsActive;
             _restoreMenuItem.Enabled = _brightnessController.IsDimmed || BlackoutManager.IsActive;
@@ -134,6 +146,7 @@ public class TrayApplicationContext : ApplicationContext
                 ? "☀️ Выключить Blackout (Alt + Backspace)" 
                 : "🌑 Ночной Blackout (Alt + Backspace)";
 
+            BuildPerMonitorMenu();
             BuildSoloScreenMenu();
             BuildSleepTimerMenu();
             BuildDimLevelSubMenu();
@@ -152,11 +165,56 @@ public class TrayApplicationContext : ApplicationContext
 
     private void OnTrayWheelScrolled(int delta)
     {
-        int newBri = _brightnessController.AdjustBrightness(delta);
-        _notifyIcon.Text = $"Screen Dimmer (Яркость: {newBri}%)";
-        _brightnessInfoItem.Text = $"📊 Текущая яркость: {newBri}% (Скролл трея)";
+        Task.Run(() =>
+        {
+            int newBri = _brightnessController.AdjustBrightness(delta);
+            BrightnessHud.ShowHud(newBri);
+        });
+    }
 
-        BrightnessHud.ShowHud(newBri);
+    private void BuildPerMonitorMenu()
+    {
+        _perMonitorBrightnessMenu.DropDownItems.Clear();
+        var monitors = _brightnessController.GetConnectedMonitors();
+
+        foreach (var mon in monitors)
+        {
+            var monMenu = new ToolStripMenuItem($"{mon.FriendlyName} ({mon.CurrentBrightness}%)");
+            int[] levels = { 100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0 };
+            foreach (int lvl in levels)
+            {
+                var lvlItem = new ToolStripMenuItem($"{lvl}%", null, (s, e) =>
+                {
+                    _brightnessController.SetMonitorBrightnessById(mon.Id, lvl);
+                    UpdateMenuState();
+                    BrightnessHud.ShowHud(lvl);
+                })
+                {
+                    Checked = (mon.CurrentBrightness == lvl)
+                };
+                monMenu.DropDownItems.Add(lvlItem);
+            }
+            _perMonitorBrightnessMenu.DropDownItems.Add(monMenu);
+        }
+    }
+
+    private void OpenDisplaySettings()
+    {
+        if (_settingsForm == null || _settingsForm.IsDisposed)
+        {
+            _settingsForm = new DisplaySettingsForm(_brightnessController);
+            _settingsForm.FormClosed += (s, e) =>
+            {
+                UpdateMenuState();
+                _autoRunMenuItem.Checked = AutoRunManager.IsAutoRunEnabled();
+            };
+            _settingsForm.Show();
+        }
+        else
+        {
+            _settingsForm.BringToFront();
+            _settingsForm.Activate();
+        }
     }
 
     private void BuildSoloScreenMenu()
@@ -290,30 +348,39 @@ public class TrayApplicationContext : ApplicationContext
 
     private void OnDimRequested()
     {
-        if (BlackoutManager.IsActive)
+        Task.Run(() =>
         {
-            BlackoutManager.Deactivate(_brightnessController);
-        }
-        _brightnessController.Dim();
-        BrightnessHud.ShowHud(SettingsManager.Current.DimPercentage);
+            if (BlackoutManager.IsActive)
+            {
+                BlackoutManager.Deactivate(_brightnessController);
+            }
+            _brightnessController.Dim();
+            BrightnessHud.ShowHud(SettingsManager.Current.DimPercentage);
+        });
     }
 
     private void OnRestoreRequested()
     {
-        if (BlackoutManager.IsActive)
+        Task.Run(() =>
         {
-            BlackoutManager.Deactivate(_brightnessController);
-        }
-        else
-        {
-            _brightnessController.Restore();
-        }
-        BrightnessHud.ShowHud(_brightnessController.GetAverageBrightness());
+            if (BlackoutManager.IsActive)
+            {
+                BlackoutManager.Deactivate(_brightnessController);
+            }
+            else
+            {
+                _brightnessController.Restore();
+            }
+            BrightnessHud.ShowHud(_brightnessController.GetAverageBrightness());
+        });
     }
 
     private void OnBlackoutToggleRequested()
     {
-        BlackoutManager.Toggle(_brightnessController);
+        Task.Run(() =>
+        {
+            BlackoutManager.Toggle(_brightnessController);
+        });
     }
 
     private void OnSleepTimerTick()
@@ -432,6 +499,7 @@ public class TrayApplicationContext : ApplicationContext
             _mouseWheelHook.Dispose();
             _sessionRecovery.Dispose();
             SleepTimerManager.Stop();
+            _settingsForm?.Dispose();
             
             _notifyIcon.Visible = false;
             _notifyIcon.ContextMenuStrip?.Dispose();

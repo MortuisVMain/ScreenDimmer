@@ -205,4 +205,34 @@ internal static class NativeMethods
     [DllImport("dxva2.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool DestroyPhysicalMonitors(uint dwPhysicalMonitorArraySize, [In] PHYSICAL_MONITOR[] pPhysicalMonitorArray);
+
+    // --- gdi32.dll (Hardware Gamma Ramp Fallback) ---
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+    public struct RAMP
+    {
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+        public ushort[] Red;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+        public ushort[] Green;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+        public ushort[] Blue;
+    }
+
+    [DllImport("gdi32.dll", SetLastError = true)]
+    public static extern bool SetDeviceGammaRamp(IntPtr hDC, ref RAMP lpRamp);
+
+    [DllImport("gdi32.dll", SetLastError = true)]
+    public static extern bool GetDeviceGammaRamp(IntPtr hDC, ref RAMP lpRamp);
+
+    [DllImport("gdi32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    public static extern IntPtr CreateDC(string? lpszDriver, string? lpszDevice, string? lpszOutput, IntPtr lpInitData);
+
+    [DllImport("gdi32.dll", SetLastError = true)]
+    public static extern bool DeleteDC(IntPtr hdc);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetDC(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
 }
