@@ -6,13 +6,13 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
-    <ApplicationIcon Condition="Exists('app.ico')">app.ico</ApplicationIcon>
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AssemblyName>ScreenDimmer</AssemblyName>
     <AssemblyTitle>Screen Dimmer</AssemblyTitle>
     <Product>Screen Dimmer</Product>
     <Description>Windows System Tray Screen Dimmer and Display Power Controller</Description>
-    <Version>1.5.3</Version>
+    <Version>1.5.4</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="app.ico" Condition="Exists('app.ico')">
+    <Content Include="app.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

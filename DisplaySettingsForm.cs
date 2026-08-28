@@ -45,6 +45,19 @@ public class DisplaySettingsForm : Form
         ShowInTaskbar = true;
         TopMost = true;
 
+        try
+        {
+            if (System.IO.File.Exists("app.ico"))
+            {
+                Icon = new Icon("app.ico");
+            }
+            else
+            {
+                Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            }
+        }
+        catch { }
+
         var mainLayout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
