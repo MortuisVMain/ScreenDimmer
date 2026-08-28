@@ -1,0 +1,36 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore ScreenDimmer.csproj
+
+    - name: Build Release
+      run: dotnet build ScreenDimmer.csproj -c Release --no-restore
+
+    - name: Publish Single-File Executable
+      run: dotnet publish ScreenDimmer.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ./publish
+
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ScreenDimmer-Win64
+        path: ./publish/ScreenDimmer.exe
