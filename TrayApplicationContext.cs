@@ -141,7 +141,14 @@ public class TrayApplicationContext : ApplicationContext
             }
             else if (_brightnessController.IsDimmed)
             {
-                _brightnessController.Restore();
+                if (UltraDarkManager.IsActive)
+                {
+                    UltraDarkManager.Deactivate(_brightnessController);
+                }
+                else
+                {
+                    _brightnessController.Restore();
+                }
             }
             else
             {
@@ -158,7 +165,7 @@ public class TrayApplicationContext : ApplicationContext
             _dimMenuItem.Enabled = !_brightnessController.IsDimmed && !BlackoutManager.IsActive;
             _ultraDarkMenuItem.Text = _brightnessController.IsUltraDark 
                 ? "☀️ Выйти из Сверхтемноты (Alt + ')" 
-                : "🌌 Сверхтемнота: Gamma Ramp (Alt + ;)";
+                : "🌌 Сверхтемнота ниже минимума (Alt + ;)";
             _ultraDarkMenuItem.Checked = _brightnessController.IsUltraDark;
             _restoreMenuItem.Enabled = _brightnessController.IsDimmed || _brightnessController.IsUltraDark || BlackoutManager.IsActive;
             _blackoutMenuItem.Text = BlackoutManager.IsActive 
@@ -186,6 +193,10 @@ public class TrayApplicationContext : ApplicationContext
     {
         Task.Run(() =>
         {
+            if (UltraDarkManager.IsActive)
+            {
+                UltraDarkManager.Deactivate(_brightnessController);
+            }
             int newBri = _brightnessController.AdjustBrightness(delta);
             BrightnessHud.ShowHud(newBri);
         });
@@ -388,7 +399,14 @@ public class TrayApplicationContext : ApplicationContext
             }
             else
             {
-                _brightnessController.Restore();
+                if (UltraDarkManager.IsActive)
+                {
+                    UltraDarkManager.Deactivate(_brightnessController);
+                }
+                else
+                {
+                    _brightnessController.Restore();
+                }
             }
             BrightnessHud.ShowHud(_brightnessController.GetAverageBrightness());
         });
@@ -544,6 +562,10 @@ public class TrayApplicationContext : ApplicationContext
             _mouseWheelHook.Dispose();
             _sessionRecovery.Dispose();
             SleepTimerManager.Stop();
+            if (UltraDarkManager.IsActive)
+            {
+                UltraDarkManager.Deactivate(_brightnessController);
+            }
             BrightnessController.ResetGammaRamp();
             _settingsForm?.Dispose();
             

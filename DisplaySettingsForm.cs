@@ -68,7 +68,7 @@ public class DisplaySettingsForm : Form
         };
         mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
         mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 130));
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 145));
 
         // 1. Header
         var headerPanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
@@ -111,7 +111,7 @@ public class DisplaySettingsForm : Form
             Text = "Общие параметры",
             ForeColor = Color.FromArgb(180, 200, 230),
             Dock = DockStyle.Top,
-            Height = 75,
+            Height = 85,
             BackColor = Color.Transparent
         };
 
@@ -152,6 +152,34 @@ public class DisplaySettingsForm : Form
         optGroup.Controls.Add(_hudCheck);
         optGroup.Controls.Add(_muteCheck);
         optGroup.Controls.Add(_autoRunCheck);
+
+        var ultraDarkLabel = new Label
+        {
+            Text = $"🌌 Фильтр: {SettingsManager.Current.UltraDarkTintPercentage}%",
+            AutoSize = true,
+            Location = new Point(175, 48),
+            ForeColor = Color.FromArgb(192, 132, 252)
+        };
+        var ultraDarkTrack = new TrackBar
+        {
+            Minimum = 20,
+            Maximum = 90,
+            Value = Math.Clamp(SettingsManager.Current.UltraDarkTintPercentage, 20, 90),
+            TickFrequency = 10,
+            SmallChange = 5,
+            LargeChange = 10,
+            Width = 180,
+            Height = 25,
+            Location = new Point(310, 44)
+        };
+        ultraDarkTrack.Scroll += (s, e) =>
+        {
+            ultraDarkLabel.Text = $"🌌 Фильтр: {ultraDarkTrack.Value}%";
+            SettingsManager.SetUltraDarkTintPercentage(ultraDarkTrack.Value);
+            UltraDarkManager.UpdateCurrentOpacity(ultraDarkTrack.Value);
+        };
+        optGroup.Controls.Add(ultraDarkLabel);
+        optGroup.Controls.Add(ultraDarkTrack);
         footerPanel.Controls.Add(optGroup);
 
         var btnPanel = new FlowLayoutPanel

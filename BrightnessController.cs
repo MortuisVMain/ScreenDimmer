@@ -47,7 +47,7 @@ public class BrightnessController
     private readonly Dictionary<string, int> _originalBrightnessMap = new();
 
     public bool IsDimmed { get; private set; }
-    public bool IsUltraDark { get; private set; }
+    public bool IsUltraDark => UltraDarkManager.IsActive;
 
     public event Action<bool>? StateChanged;
     public event Action? MonitorsUpdated;
@@ -429,10 +429,9 @@ public class BrightnessController
             }
 
             IsDimmed = false;
-            if (IsUltraDark)
+            if (UltraDarkManager.IsActive)
             {
-                ResetGammaRamp();
-                IsUltraDark = false;
+                UltraDarkManager.Deactivate(this, restoreBrightness: false);
             }
             SaveStateToDisk();
         }
@@ -443,30 +442,12 @@ public class BrightnessController
 
     public void EnableUltraDark()
     {
-        lock (_lock)
-        {
-            // 1. Аппаратная яркость всех дисплеев в 0%
-            Dim(0);
-
-            // 2. Аппаратный сжатый Gamma Ramp GPU (30% R, 24% G, 18% B) для глубокой ночной мягкости
-            ApplyGammaRamp(0.30f, 0.24f, 0.18f);
-
-            IsUltraDark = true;
-            SaveStateToDisk();
-        }
-
-        StateChanged?.Invoke(true);
-        MonitorsUpdated?.Invoke();
+        UltraDarkManager.Activate(this);
     }
 
     public void RestoreFromUltraDark()
     {
-        lock (_lock)
-        {
-            ResetGammaRamp();
-            IsUltraDark = false;
-            Restore();
-        }
+        UltraDarkManager.Deactivate(this);
     }
 
     public static void ApplyGammaRamp(float factorR, float factorG, float factorB)
@@ -525,10 +506,9 @@ public class BrightnessController
             newBri = Math.Clamp(current + delta, 0, 100);
 
             IsDimmed = false;
-            if (IsUltraDark)
+            if (UltraDarkManager.IsActive)
             {
-                ResetGammaRamp();
-                IsUltraDark = false;
+                UltraDarkManager.Deactivate(this, restoreBrightness: false);
             }
 
             var ddcMonitors = GetDdcPhysicalMonitors();

@@ -21,6 +21,7 @@ public class AppSettings
     public bool FadeAnimation { get; set; } = true;
     public bool MuteAudioInBlackout { get; set; } = false;
     public bool ShowBrightnessHud { get; set; } = true;
+    public int UltraDarkTintPercentage { get; set; } = 55;
     public Dictionary<string, MonitorSetting> MonitorSettings { get; set; } = new();
 }
 
@@ -122,6 +123,12 @@ public static class SettingsManager
     public static void SetMuteAudioInBlackout(bool enable)
     {
         _settings.MuteAudioInBlackout = enable;
+        Save();
+    }
+
+    public static void SetUltraDarkTintPercentage(int percent)
+    {
+        _settings.UltraDarkTintPercentage = Math.Clamp(percent, 10, 95);
         Save();
     }
 
