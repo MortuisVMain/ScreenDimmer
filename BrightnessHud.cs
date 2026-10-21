@@ -21,11 +21,11 @@ public class BrightnessHud : Form
         ShowInTaskbar = false;
         TopMost = true;
         DoubleBuffered = true;
-        Size = new Size(220, 56);
-        BackColor = Color.FromArgb(20, 24, 34);
+        Size = new Size(240, 64);
+        BackColor = Color.FromArgb(18, 18, 22);
 
         var primary = Screen.PrimaryScreen?.Bounds ?? new Rectangle(0, 0, 1920, 1080);
-        Location = new Point(primary.Left + (primary.Width - Width) / 2, primary.Top + 60);
+        Location = new Point(primary.Left + (primary.Width - Width) / 2, primary.Top + 56);
 
         Opacity = 0.0;
     }
@@ -64,18 +64,18 @@ public class BrightnessHud : Form
 
     private async Task AnimateHudAsync(int displayId)
     {
-        while (Opacity < 0.95 && displayId == _displayCounter)
+        while (Opacity < 0.96 && displayId == _displayCounter)
         {
-            Opacity = Math.Min(0.95, Opacity + 0.2);
-            await Task.Delay(15);
+            Opacity = Math.Min(0.96, Opacity + 0.18);
+            await Task.Delay(14);
         }
 
-        await Task.Delay(1000);
+        await Task.Delay(1100);
 
         while (Opacity > 0.0 && displayId == _displayCounter)
         {
-            Opacity = Math.Max(0.0, Opacity - 0.15);
-            await Task.Delay(20);
+            Opacity = Math.Max(0.0, Opacity - 0.12);
+            await Task.Delay(18);
         }
     }
 
@@ -84,42 +84,65 @@ public class BrightnessHud : Form
         base.OnPaint(e);
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
-        using var bgPath = GetRoundedRect(new Rectangle(0, 0, Width - 1, Height - 1), 16);
-        using (var bgBrush = new SolidBrush(Color.FromArgb(235, 20, 24, 34)))
+        // 1. Apple Cupertino Frosted Glass Capsule
+        using var bgPath = GetRoundedRect(new Rectangle(0, 0, Width - 1, Height - 1), 20);
+        using (var bgBrush = new SolidBrush(Color.FromArgb(240, 22, 22, 26)))
         {
             g.FillPath(bgBrush, bgPath);
         }
-        using (var borderPen = new Pen(Color.FromArgb(100, 56, 189, 248), 1.5f))
+        
+        // 2. Subpixel Hairline Border (1px Apple translucent border)
+        using (var borderPen = new Pen(Color.FromArgb(42, 255, 255, 255), 1.0f))
         {
             g.DrawPath(borderPen, bgPath);
         }
 
-        string text = $"☀️  Яркость: {_percentage}%";
-        using var font = new Font("Segoe UI", 10.5f, FontStyle.Bold);
-        using var textBrush = new SolidBrush(Color.White);
-        g.DrawString(text, font, textBrush, new PointF(16, 10));
+        // 3. Apple Icon & Typography
+        string icon = _percentage switch
+        {
+            0 => "🌑",
+            < 30 => "🌘",
+            < 70 => "🌤️",
+            _ => "☀️"
+        };
 
-        int barX = 16;
-        int barY = 36;
-        int barWidth = Width - 32;
-        int barHeight = 8;
+        using var fontTitle = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+        using var fontValue = new Font("Segoe UI", 10.0f, FontStyle.Bold);
+        using var brushTitle = new SolidBrush(Color.FromArgb(180, 245, 245, 247));
+        using var brushValue = new SolidBrush(Color.FromArgb(245, 245, 247));
 
-        using var trackPath = GetRoundedRect(new Rectangle(barX, barY, barWidth, barHeight), 4);
-        using (var trackBrush = new SolidBrush(Color.FromArgb(50, 60, 80)))
+        // Draw icon & title
+        g.DrawString($"{icon}  Яркость", fontTitle, brushTitle, new PointF(18, 12));
+        
+        // Right-aligned percentage
+        string valText = $"{_percentage}%";
+        var valSize = g.MeasureString(valText, fontValue);
+        g.DrawString(valText, fontValue, brushValue, new PointF(Width - 18 - valSize.Width, 11));
+
+        // 4. Apple Capsule Slider Track
+        int barX = 18;
+        int barY = 38;
+        int barWidth = Width - 36;
+        int barHeight = 10;
+
+        using var trackPath = GetRoundedRect(new Rectangle(barX, barY, barWidth, barHeight), 5);
+        using (var trackBrush = new SolidBrush(Color.FromArgb(48, 48, 54)))
         {
             g.FillPath(trackBrush, trackPath);
         }
 
+        // 5. Active Fill with Apple Vibrant Accent
         int fillWidth = (int)(barWidth * (_percentage / 100.0));
-        if (fillWidth > 4)
+        if (fillWidth > 6)
         {
-            using var fillPath = GetRoundedRect(new Rectangle(barX, barY, fillWidth, barHeight), 4);
+            using var fillPath = GetRoundedRect(new Rectangle(barX, barY, fillWidth, barHeight), 5);
             using var fillBrush = new LinearGradientBrush(
                 new Point(barX, barY),
                 new Point(barX + barWidth, barY),
-                Color.FromArgb(255, 210, 50),
-                Color.FromArgb(56, 189, 248)
+                Color.FromArgb(245, 245, 247),
+                Color.FromArgb(0, 113, 227) // Apple Accent Blue
             );
             g.FillPath(fillBrush, fillPath);
         }
