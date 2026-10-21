@@ -13,6 +13,8 @@ public class BrightnessHud : Form
     private static int _displayCounter;
 
     private int _percentage = 80;
+    private string? _customTitle;
+    private bool _isUltraDark;
 
     private BrightnessHud()
     {
@@ -54,7 +56,31 @@ public class BrightnessHud : Form
                 _instance.Show();
             }
 
+            _instance._isUltraDark = false;
+            _instance._customTitle = null;
             _instance._percentage = Math.Clamp(percentage, 0, 100);
+            _instance.Invalidate();
+
+            int currentId = ++_displayCounter;
+            _ = _instance.AnimateHudAsync(currentId);
+        }
+    }
+
+    public static void ShowUltraDarkHud()
+    {
+        if (!SettingsManager.Current.ShowBrightnessHud || BlackoutManager.IsActive) return;
+
+        lock (_lock)
+        {
+            if (_instance == null || _instance.IsDisposed)
+            {
+                _instance = new BrightnessHud();
+                _instance.Show();
+            }
+
+            _instance._isUltraDark = true;
+            _instance._customTitle = "🌌  Сверхтемнота (Ultra-Dark)";
+            _instance._percentage = 0;
             _instance.Invalidate();
 
             int currentId = ++_displayCounter;
@@ -95,7 +121,9 @@ public class BrightnessHud : Form
             g.DrawPath(borderPen, bgPath);
         }
 
-        string text = $"☀️  Яркость: {_percentage}%";
+        string text = _isUltraDark && !string.IsNullOrEmpty(_customTitle)
+            ? _customTitle
+            : $"☀️  Яркость: {_percentage}%";
         using var font = new Font("Segoe UI", 10.5f, FontStyle.Bold);
         using var textBrush = new SolidBrush(Color.White);
         g.DrawString(text, font, textBrush, new PointF(16, 10));
@@ -111,11 +139,11 @@ public class BrightnessHud : Form
             g.FillPath(trackBrush, trackPath);
         }
 
-        int fillWidth = (int)(barWidth * (_percentage / 100.0));
+        int fillWidth = _isUltraDark ? (int)(barWidth * 0.15) : (int)(barWidth * (_percentage / 100.0));
         if (fillWidth > 4)
         {
             using var fillPath = GetRoundedRect(new Rectangle(barX, barY, fillWidth, barHeight), 4);
-            using var fillBrush = new LinearGradientBrush(
+            using Brush fillBrush = _isUltraDark ? new SolidBrush(Color.FromArgb(168, 85, 247)) : new LinearGradientBrush(
                 new Point(barX, barY),
                 new Point(barX + barWidth, barY),
                 Color.FromArgb(255, 210, 50),

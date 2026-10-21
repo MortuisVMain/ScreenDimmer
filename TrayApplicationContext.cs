@@ -15,6 +15,7 @@ public class TrayApplicationContext : ApplicationContext
 
     private readonly ToolStripMenuItem _blackoutMenuItem;
     private readonly ToolStripMenuItem _dimMenuItem;
+    private readonly ToolStripMenuItem _ultraDarkMenuItem;
     private readonly ToolStripMenuItem _restoreMenuItem;
     private readonly ToolStripMenuItem _perMonitorBrightnessMenu;
     private readonly ToolStripMenuItem _soloScreenMenu;
@@ -39,6 +40,8 @@ public class TrayApplicationContext : ApplicationContext
         // Подписка на горячие клавиши и события
         _keyboardHook.DimRequested += OnDimRequested;
         _keyboardHook.RestoreRequested += OnRestoreRequested;
+        _keyboardHook.UltraDarkRequested += OnUltraDarkRequested;
+        _keyboardHook.UltraDarkRestoreRequested += OnUltraDarkRestoreRequested;
         _keyboardHook.BlackoutToggleRequested += OnBlackoutToggleRequested;
 
         // Регулировка яркости колесиком мыши по трею
@@ -55,6 +58,17 @@ public class TrayApplicationContext : ApplicationContext
 
         _blackoutMenuItem = new ToolStripMenuItem("🌑 Ночной Blackout (Alt + Backspace)", null, (s, e) => BlackoutManager.Toggle(_brightnessController));
         _dimMenuItem = new ToolStripMenuItem($"🌙 Затемнить до {SettingsManager.Current.DimPercentage}% (Alt + .)", null, (s, e) => _brightnessController.Dim());
+        _ultraDarkMenuItem = new ToolStripMenuItem("🌌 Сверхтемнота (Alt + ;)", null, (s, e) =>
+        {
+            if (_brightnessController.IsUltraDark)
+            {
+                OnUltraDarkRestoreRequested();
+            }
+            else
+            {
+                OnUltraDarkRequested();
+            }
+        });
         _restoreMenuItem = new ToolStripMenuItem("☀️ Восстановить яркость (Alt + /)", null, (s, e) => OnRestoreRequested());
 
         // Подменю раздельного управления яркостью каждого монитора
@@ -94,6 +108,7 @@ public class TrayApplicationContext : ApplicationContext
 
         contextMenu.Items.Add(_blackoutMenuItem);
         contextMenu.Items.Add(_dimMenuItem);
+        contextMenu.Items.Add(_ultraDarkMenuItem);
         contextMenu.Items.Add(_restoreMenuItem);
         contextMenu.Items.Add(new ToolStripSeparator());
         contextMenu.Items.Add(_perMonitorBrightnessMenu);
@@ -141,7 +156,11 @@ public class TrayApplicationContext : ApplicationContext
             _brightnessInfoItem.Text = $"📊 Средняя яркость: {bri}% (Скролл трея)";
             _dimMenuItem.Text = $"🌙 Затемнить до {SettingsManager.Current.DimPercentage}% (Alt + .)";
             _dimMenuItem.Enabled = !_brightnessController.IsDimmed && !BlackoutManager.IsActive;
-            _restoreMenuItem.Enabled = _brightnessController.IsDimmed || BlackoutManager.IsActive;
+            _ultraDarkMenuItem.Text = _brightnessController.IsUltraDark 
+                ? "☀️ Выйти из Сверхтемноты (Alt + ')" 
+                : "🌌 Сверхтемнота: Gamma Ramp (Alt + ;)";
+            _ultraDarkMenuItem.Checked = _brightnessController.IsUltraDark;
+            _restoreMenuItem.Enabled = _brightnessController.IsDimmed || _brightnessController.IsUltraDark || BlackoutManager.IsActive;
             _blackoutMenuItem.Text = BlackoutManager.IsActive 
                 ? "☀️ Выключить Blackout (Alt + Backspace)" 
                 : "🌑 Ночной Blackout (Alt + Backspace)";
@@ -158,7 +177,7 @@ public class TrayApplicationContext : ApplicationContext
         _notifyIcon.ShowBalloonTip(
             3000,
             "Screen Dimmer Pro активен",
-            "Alt + Backspace — Ночной Blackout (экраны 100% темные, ПК не спит)\nКолесико по трею — быстрая яркость\nAlt + . / Alt + / — затемнить / восстановить",
+            "Alt + Backspace — Ночной Blackout\nAlt + ; / Alt + ' — Сверхтемнота / Возврат к норме\nAlt + . / Alt + / — затемнить / восстановить",
             ToolTipIcon.Info
         );
     }
@@ -383,6 +402,32 @@ public class TrayApplicationContext : ApplicationContext
         });
     }
 
+    private void OnUltraDarkRequested()
+    {
+        Task.Run(() =>
+        {
+            if (BlackoutManager.IsActive)
+            {
+                BlackoutManager.Deactivate(_brightnessController);
+            }
+            _brightnessController.EnableUltraDark();
+            BrightnessHud.ShowUltraDarkHud();
+        });
+    }
+
+    private void OnUltraDarkRestoreRequested()
+    {
+        Task.Run(() =>
+        {
+            if (BlackoutManager.IsActive)
+            {
+                BlackoutManager.Deactivate(_brightnessController);
+            }
+            _brightnessController.RestoreFromUltraDark();
+            BrightnessHud.ShowHud(_brightnessController.GetAverageBrightness());
+        });
+    }
+
     private void OnSleepTimerTick()
     {
         if (SleepTimerManager.IsRunning)
@@ -499,6 +544,7 @@ public class TrayApplicationContext : ApplicationContext
             _mouseWheelHook.Dispose();
             _sessionRecovery.Dispose();
             SleepTimerManager.Stop();
+            BrightnessController.ResetGammaRamp();
             _settingsForm?.Dispose();
             
             _notifyIcon.Visible = false;

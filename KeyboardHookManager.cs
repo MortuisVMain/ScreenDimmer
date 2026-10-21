@@ -14,6 +14,8 @@ public class KeyboardHookManager : IDisposable
     public event Action? DimRequested;
     public event Action? RestoreRequested;
     public event Action? BlackoutToggleRequested;
+    public event Action? UltraDarkRequested;
+    public event Action? UltraDarkRestoreRequested;
 
     public KeyboardHookManager()
     {
@@ -69,6 +71,20 @@ public class KeyboardHookManager : IDisposable
                 if (isAltDown && (scanCode == NativeMethods.SCAN_CODE_SLASH || vkCode == NativeMethods.VK_OEM_2))
                 {
                     RestoreRequested?.Invoke();
+                    return (IntPtr)1;
+                }
+
+                // 4. Комбинация Alt + ; -> Включение режима Сверхтемноты (Ultra-Dark Mode)
+                if (isAltDown && (scanCode == NativeMethods.SCAN_CODE_SEMICOLON || vkCode == NativeMethods.VK_OEM_1))
+                {
+                    UltraDarkRequested?.Invoke();
+                    return (IntPtr)1;
+                }
+
+                // 5. Комбинация Alt + ' -> Выключение Сверхтемноты и возврат к сохраненным ранее настройкам
+                if (isAltDown && (scanCode == NativeMethods.SCAN_CODE_APOSTROPHE || vkCode == NativeMethods.VK_OEM_7))
+                {
+                    UltraDarkRestoreRequested?.Invoke();
                     return (IntPtr)1;
                 }
 

@@ -82,7 +82,7 @@ public class DisplaySettingsForm : Form
         };
         var subTitleLabel = new Label
         {
-            Text = "Индивидуальная калибровка и раздельное управление каждым дисплеем",
+            Text = "Индивидуальная калибровка | Alt+; — Сверхтемнота, Alt+' — Возврат, Alt+Backspace — Blackout",
             Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
             ForeColor = Color.FromArgb(140, 160, 190),
             AutoSize = true,

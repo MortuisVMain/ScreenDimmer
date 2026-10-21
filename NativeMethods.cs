@@ -4,7 +4,7 @@ using System.Text;
 
 namespace ScreenDimmer;
 
-internal static class NativeMethods
+public static class NativeMethods
 {
     // --- Win32 Constants ---
     public const int WH_KEYBOARD_LL = 13;
@@ -54,6 +54,8 @@ internal static class NativeMethods
     public const int VK_RWIN = 0x5C;        // Right Windows key
     public const int VK_OEM_PERIOD = 0xBE;  // . / > / Ю
     public const int VK_OEM_2 = 0xBF;       // / / ? / .
+    public const int VK_OEM_1 = 0xBA;       // ; / : / Ж (Ultra-Dark Mode)
+    public const int VK_OEM_7 = 0xDE;       // ' / " / Э (Restore from Ultra-Dark)
     public const byte VK_VOLUME_MUTE = 0xAD; // Audio Mute key
 
     public const uint KEYEVENTF_KEYUP = 0x0002;
@@ -62,6 +64,8 @@ internal static class NativeMethods
     public const uint SCAN_CODE_BACKSPACE = 0x0E; // Physical key for Backspace
     public const uint SCAN_CODE_PERIOD = 0x34;    // Physical key for Period ('.' in EN, 'Ю' in RU)
     public const uint SCAN_CODE_SLASH = 0x35;     // Physical key for Slash ('/' in EN, '.' in RU)
+    public const uint SCAN_CODE_SEMICOLON = 0x27; // Physical key for Semicolon (';' in EN, 'Ж' in RU)
+    public const uint SCAN_CODE_APOSTROPHE = 0x28; // Physical key for Apostrophe (''' in EN, 'Э' in RU)
 
     public const uint MOUSEEVENTF_MOVE = 0x0001;
 

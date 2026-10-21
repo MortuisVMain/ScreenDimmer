@@ -31,6 +31,7 @@ public class MonitorBrightnessState
 public class AppStateData
 {
     public bool IsDimmed { get; set; }
+    public bool IsUltraDark { get; set; }
     public List<MonitorBrightnessState> Monitors { get; set; } = new();
 }
 
@@ -46,6 +47,7 @@ public class BrightnessController
     private readonly Dictionary<string, int> _originalBrightnessMap = new();
 
     public bool IsDimmed { get; private set; }
+    public bool IsUltraDark { get; private set; }
 
     public event Action<bool>? StateChanged;
     public event Action? MonitorsUpdated;
@@ -89,11 +91,13 @@ public class BrightnessController
     {
         try
         {
+            ResetGammaRamp();
+
             if (File.Exists(StateFilePath))
             {
                 string json = File.ReadAllText(StateFilePath);
                 var state = JsonSerializer.Deserialize<AppStateData>(json);
-                if (state != null && state.IsDimmed && state.Monitors.Count > 0)
+                if (state != null && (state.IsDimmed || state.IsUltraDark) && state.Monitors.Count > 0)
                 {
                     foreach (var m in state.Monitors)
                     {
@@ -114,6 +118,7 @@ public class BrightnessController
             var data = new AppStateData
             {
                 IsDimmed = IsDimmed,
+                IsUltraDark = IsUltraDark,
                 Monitors = new List<MonitorBrightnessState>()
             };
 
@@ -424,11 +429,91 @@ public class BrightnessController
             }
 
             IsDimmed = false;
+            if (IsUltraDark)
+            {
+                ResetGammaRamp();
+                IsUltraDark = false;
+            }
             SaveStateToDisk();
         }
 
         StateChanged?.Invoke(false);
         MonitorsUpdated?.Invoke();
+    }
+
+    public void EnableUltraDark()
+    {
+        lock (_lock)
+        {
+            // 1. Аппаратная яркость всех дисплеев в 0%
+            Dim(0);
+
+            // 2. Аппаратный сжатый Gamma Ramp GPU (30% R, 24% G, 18% B) для глубокой ночной мягкости
+            ApplyGammaRamp(0.30f, 0.24f, 0.18f);
+
+            IsUltraDark = true;
+            SaveStateToDisk();
+        }
+
+        StateChanged?.Invoke(true);
+        MonitorsUpdated?.Invoke();
+    }
+
+    public void RestoreFromUltraDark()
+    {
+        lock (_lock)
+        {
+            ResetGammaRamp();
+            IsUltraDark = false;
+            Restore();
+        }
+    }
+
+    public static void ApplyGammaRamp(float factorR, float factorG, float factorB)
+    {
+        var ramp = new NativeMethods.RAMP
+        {
+            Red = new ushort[256],
+            Green = new ushort[256],
+            Blue = new ushort[256]
+        };
+
+        for (int i = 0; i < 256; i++)
+        {
+            ramp.Red[i] = (ushort)Math.Clamp((int)(i * 256 * factorR), 0, 65535);
+            ramp.Green[i] = (ushort)Math.Clamp((int)(i * 256 * factorG), 0, 65535);
+            ramp.Blue[i] = (ushort)Math.Clamp((int)(i * 256 * factorB), 0, 65535);
+        }
+
+        foreach (var s in Screen.AllScreens)
+        {
+            try
+            {
+                IntPtr hdc = NativeMethods.CreateDC(null, s.DeviceName, null, IntPtr.Zero);
+                if (hdc != IntPtr.Zero)
+                {
+                    NativeMethods.SetDeviceGammaRamp(hdc, ref ramp);
+                    NativeMethods.DeleteDC(hdc);
+                }
+            }
+            catch { }
+        }
+
+        try
+        {
+            IntPtr primaryHdc = NativeMethods.GetDC(IntPtr.Zero);
+            if (primaryHdc != IntPtr.Zero)
+            {
+                NativeMethods.SetDeviceGammaRamp(primaryHdc, ref ramp);
+                NativeMethods.ReleaseDC(IntPtr.Zero, primaryHdc);
+            }
+        }
+        catch { }
+    }
+
+    public static void ResetGammaRamp()
+    {
+        ApplyGammaRamp(1.0f, 1.0f, 1.0f);
     }
 
     public int AdjustBrightness(int delta)
@@ -440,6 +525,11 @@ public class BrightnessController
             newBri = Math.Clamp(current + delta, 0, 100);
 
             IsDimmed = false;
+            if (IsUltraDark)
+            {
+                ResetGammaRamp();
+                IsUltraDark = false;
+            }
 
             var ddcMonitors = GetDdcPhysicalMonitors();
             try
